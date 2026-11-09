@@ -1,0 +1,7 @@
+{
+  "name": "piksel-maskot",
+  "version": "1.0.0",
+  "description": "A small 3D robot that stands on the Claude Code desktop prompt: it bounces a tennis ball when idle and types on a laptop while Claude works.",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

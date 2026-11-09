@@ -1,0 +1,5 @@
+{
+  "name": "piksel-maskot",
+  "owner": { "name": "Hakanynyrt" },
+  "plugins": [{ "name": "piksel-maskot", "source": "./" }]
+}
