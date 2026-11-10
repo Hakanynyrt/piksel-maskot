@@ -2,3 +2,5 @@ overlay/state/
 overlay/position.json
 .claude-plugin/types/
 tsconfig.json
+overlay/overlay.log
+__pycache__/

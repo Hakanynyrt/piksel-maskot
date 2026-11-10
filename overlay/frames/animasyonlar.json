@@ -1,0 +1,58 @@
+{
+  "animations": {
+    "idle": {
+      "frames": 32,
+      "ms": 50,
+      "group": "idle",
+      "loop": true
+    },
+    "work": {
+      "frames": 36,
+      "ms": 83,
+      "group": "work",
+      "loop": true
+    },
+    "reading": {
+      "frames": 40,
+      "ms": 80,
+      "group": "idle",
+      "loop": true
+    },
+    "stretch": {
+      "frames": 44,
+      "ms": 80,
+      "group": "idle",
+      "loop": true
+    },
+    "wave": {
+      "frames": 32,
+      "ms": 75,
+      "group": "idle",
+      "loop": true
+    },
+    "waiting": {
+      "frames": 24,
+      "ms": 70,
+      "group": "waiting",
+      "loop": true
+    },
+    "celebrate": {
+      "frames": 24,
+      "ms": 50,
+      "group": "done",
+      "loop": false
+    },
+    "error": {
+      "frames": 24,
+      "ms": 50,
+      "group": "error",
+      "loop": false
+    },
+    "sleep": {
+      "frames": 48,
+      "ms": 100,
+      "group": "sleep",
+      "loop": true
+    }
+  }
+}

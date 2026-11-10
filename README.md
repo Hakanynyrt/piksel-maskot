@@ -1,6 +1,12 @@
 # piksel-maskot
 
-A small 3D robot for the Claude desktop app on Windows. It stands on top of the message box in its own transparent window: while Claude is idle it bounces a tennis ball on its racket, and while Claude works it types on a laptop.
+A small 3D robot for the Claude desktop app on Windows. It stands on top of the message box in its own transparent window.
+
+- Idle: bounces a tennis ball, reads a book, stretches and yawns, or waves, in random order. After 5 minutes it falls asleep.
+- Working: types on a laptop.
+- Needs your approval: raises an arm and shows a red "!".
+- Finished: jumps with confetti.
+- Failed: shows a red X.
 
 ## Requirements
 
@@ -26,7 +32,8 @@ Restart the app after installing. When a Claude Code session starts, the mod lau
 ## Good to know
 
 - The default position assumes the left sidebar is open. If you close the sidebar, drag the robot to the message box.
-- Sessions that started before the install do not report when Claude is working until they are reopened.
+- Sessions that started before the install do not report their state until they are reopened.
+- The approval animation can stay until the approved command ends, because the app does not report the moment you answer.
 - The mod API it uses is in early access and may change between Claude Code releases.
 
 This is an independent community project and is not affiliated with or endorsed by Anthropic.
