@@ -1,5 +1,7 @@
 # piksel-maskot
 
+> **Current status: not working yet.** The robot does not appear in current versions of the Claude desktop app, because this app version does not draw the mod backdrop layer it relies on. A different approach is in progress.
+
 A small 3D robot for the Claude Code desktop app. It stands on top of the message box: while Claude is idle it bounces a tennis ball on its racket, and while Claude works it types on a laptop.
 
 The robot is drawn as animated SVG from a small 3D box model, with flat colors. If your system asks for reduced motion, it stands still.
