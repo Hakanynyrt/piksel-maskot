@@ -1,6 +1,6 @@
 {
   "name": "piksel-maskot",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "A small 3D robot in a transparent window that stands on the Claude desktop message box: it has several idle activities, types on a laptop while Claude works, and reacts when Claude needs you, finishes or fails.",
   "license": "MIT"
 }
