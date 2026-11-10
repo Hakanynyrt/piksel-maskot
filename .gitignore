@@ -1,0 +1,4 @@
+overlay/state/
+overlay/position.json
+.claude-plugin/types/
+tsconfig.json
