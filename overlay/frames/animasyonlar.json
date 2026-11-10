@@ -12,6 +12,12 @@
       "group": "work",
       "loop": true
     },
+    "whip": {
+      "frames": 40,
+      "ms": 60,
+      "group": "idle",
+      "loop": true
+    },
     "reading": {
       "frames": 40,
       "ms": 80,

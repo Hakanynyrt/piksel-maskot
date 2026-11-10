@@ -2,7 +2,7 @@
 
 A small 3D robot for the Claude desktop app on Windows. It stands on top of the message box in its own transparent window.
 
-- Idle: bounces a tennis ball, reads a book, stretches and yawns, or waves, in random order. After 5 minutes it falls asleep.
+- Idle: bounces a tennis ball, reads a book, stretches and yawns, waves, or cracks a whip, in random order. After 5 minutes it falls asleep.
 - Working: types on a laptop.
 - Needs your approval: raises an arm and shows a red "!".
 - Finished: jumps with confetti.
