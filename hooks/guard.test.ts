@@ -20,7 +20,7 @@ const TABLE: Row[] = [
   ['rm -rf ../project/.git', B, true],
   ['rm -rf ..', B, true],
   ['rm -rf C:\\', B, true],
-  ['rm -rf /c/Users/Hakan', B, true],
+  ['rm -rf /c/UsersAlex', B, true],
   ['rm -rf "C:\\Windows\\System32"', B, true],
   ['rm -rf ~/Desktop', B, true],
   ['rm -rf "$BUILD_DIR/"', B, true],
