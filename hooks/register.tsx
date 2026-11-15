@@ -2,6 +2,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 // Starts the transparent robot window and tells it what this session is doing.
 const HEARTBEAT_MS = 30000
+// Celebrate only after turns that took at least this long.
+const LONG_TURN_MS = 60000
 const QUESTION_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
 type TurnEvent = 'done' | 'error'
@@ -15,6 +17,8 @@ type Status = {
   eventId: number
   // When the event happened; heartbeats leave it alone.
   eventAt: number
+  // When the main turn started.
+  mainStartedAt: number
   timer?: { cancel: () => void }
 }
 
@@ -61,6 +65,7 @@ export const register: Register = on => {
     event: null,
     eventId: 0,
     eventAt: 0,
+    mainStartedAt: 0,
   }
 
   on('session.start', async ($, e, next) => {
@@ -84,7 +89,10 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     s.turns.add(e.turnId)
-    if (e.agentId === undefined) s.event = null
+    if (e.agentId === undefined) {
+      s.event = null
+      s.mainStartedAt = await $.clock.now()
+    }
     await publish($, s)
 
     return next(e)
@@ -94,11 +102,14 @@ export const register: Register = on => {
     s.turns.delete(e.turnId)
     if (s.turns.size === 0) s.asks.clear()
 
+    const isLong = (await $.clock.now()) - s.mainStartedAt >= LONG_TURN_MS
     const raised =
       e.agentId !== undefined || e.reason === 'aborted'
         ? undefined
         : e.reason === 'answer'
-          ? 'done'
+          ? isLong
+            ? 'done'
+            : undefined
           : 'error'
 
     await publish($, s, raised)

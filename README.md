@@ -5,7 +5,7 @@ A small 3D robot for the Claude desktop app on Windows. It stands on top of the 
 - Idle: bounces a tennis ball, reads a book, does jumping jacks, waves, or cracks a whip, in random order. It never sleeps.
 - Working: types on a laptop.
 - Needs your approval: raises an arm and shows a red "!".
-- Finished: jumps with confetti.
+- Finished a task that took at least a minute: jumps with confetti.
 - Failed: shows a red X.
 
 ## Requirements
