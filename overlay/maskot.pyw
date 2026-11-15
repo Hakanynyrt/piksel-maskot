@@ -29,8 +29,13 @@ MIN_CLAUDE_AREA = 200000
 MUTEX_NAME = 'piksel-maskot-robot'
 OFF_SCREEN = -32000          # Claude bulunana kadar pencere gorunmez bir yerde bekler
 
-GROUPS = frozenset(('idle', 'work', 'waiting', 'done', 'error', 'sleep'))
-EVENT_GROUPS = frozenset(('done', 'error'))
+GROUPS = frozenset(('idle', 'work', 'waiting', 'done', 'error', 'sleep', 'alarm'))
+# Durum dosyasindaki olay -> oynatilacak grup adaylari (ilk bulunan oynar) ve oncelik.
+# danger (tehlike korumasi bir komutu durdurdu) done/error'dan once gelir; alarm karesi yoksa error oynar.
+EVENT_TARGETS = {'done': ('done',), 'error': ('error',), 'danger': ('alarm', 'error')}
+EVENT_RANK = {'done': 1, 'error': 1, 'danger': 2}
+EVENTS = frozenset(EVENT_TARGETS)
+ONESHOT_GROUPS = frozenset(('done', 'error', 'alarm'))
 STALE_MS = 75_000
 EVENT_MAX_AGE_MS = 10_000
 SLEEP_AFTER_MS = 300_000
@@ -153,7 +158,7 @@ def normalize_status(session, mtime_ms, data):
         'mtime': mtime_ms,
         'working': bool(data.get('working')),
         'waiting': bool(data.get('waiting')),
-        'event': event if event in EVENT_GROUPS else None,
+        'event': event if event in EVENTS else None,
         'eventId': number(data.get('eventId')),
         'at': number(data.get('at')),
     }
@@ -231,12 +236,17 @@ def purge_old_status(folder, now_ms):
 # --- Saf secim mantigi -------------------------------------------------------
 
 def new_memory(now_ms):
-    return {'seen': {}, 'oneshot': None, 'last_active': now_ms}
+    return {'seen': {}, 'oneshot': None, 'rank': 0, 'last_active': now_ms}
 
 
 def finish_event(mem):
-    """Oynayan done/error animasyonu bittiginde cagrilir."""
-    return {**mem, 'oneshot': None}
+    """Oynayan done/error/alarm animasyonu bittiginde cagrilir."""
+    return {**mem, 'oneshot': None, 'rank': 0}
+
+
+def event_group(event, groups):
+    """Olayin oynatilacak grubu; katalogda hicbir adayi yoksa None."""
+    return next((g for g in EVENT_TARGETS.get(event, ()) if g in groups), None)
 
 
 def restored_memory(mem, newest_ms, now_ms):
@@ -247,10 +257,13 @@ def restored_memory(mem, newest_ms, now_ms):
 
 
 def decide(statuses, now_ms, mem, groups=GROUPS):
-    """Oncelik: waiting > tek seferlik done/error > working > (5 dk sonra sleep) > idle.
+    """Oncelik: waiting > tek seferlik danger (alarm) > tek seferlik done/error > working
+    > (5 dk sonra sleep) > idle.
 
     Saf fonksiyondur: saat, durumlar ve hafiza disaridan gelir, yeni hafiza Decision icinde doner.
-    `groups` katalogda animasyonu bulunan gruplardir; olmayan grup atlanir.
+    `groups` katalogda animasyonu bulunan gruplardir; olmayan grup atlanir (danger -> alarm, yoksa error).
+    Ayni anda gelen ayni oncelikli olaylardan en yenisi oynar, digerleri harcanir. Daha dusuk
+    oncelikli taze olay harcanmaz: ustteki bitince hala 10 sn icindeyse oynar.
     """
     live = [s for s in statuses if now_ms - s['mtime'] < STALE_MS]
     waiting = any(s['waiting'] for s in live)
@@ -268,14 +281,18 @@ def decide(statuses, now_ms, mem, groups=GROUPS):
             seen[s['id']] = s['eventId']  # suresi gecti, bir daha bakilmaz
 
     oneshot, new_event = mem['oneshot'], False
+    rank = mem.get('rank', 0) if oneshot else 0
     if show_waiting:
-        oneshot = None  # taze olaylar isaretlenmez: bekleme 10 sn icinde biterse yine oynar
+        oneshot, rank = None, 0  # taze olaylar isaretlenmez: bekleme 10 sn icinde biterse yine oynar
     elif fresh:
-        for s in fresh:
-            seen[s['id']] = s['eventId']
-        newest = max(fresh, key=lambda s: s['at'])
-        if newest['event'] in groups:
-            oneshot, new_event = newest['event'], True
+        top = max(EVENT_RANK[s['event']] for s in fresh)
+        if top >= rank:  # daha dusuk oncelikli olay oynayani kesmez, sirasini bekler
+            chosen = [s for s in fresh if EVENT_RANK[s['event']] == top]
+            for s in chosen:
+                seen[s['id']] = s['eventId']
+            group = event_group(max(chosen, key=lambda s: s['at'])['event'], groups)
+            if group:
+                oneshot, rank, new_event = group, top, True
 
     last_active = now_ms if (waiting or working or fresh or oneshot) else mem['last_active']
     if show_waiting:
@@ -288,7 +305,8 @@ def decide(statuses, now_ms, mem, groups=GROUPS):
         state = 'sleep'
     else:
         state = 'idle'
-    return Decision(state, new_event, {'seen': seen, 'oneshot': oneshot, 'last_active': last_active})
+    return Decision(state, new_event,
+                    {'seen': seen, 'oneshot': oneshot, 'rank': rank, 'last_active': last_active})
 
 
 class Player:
@@ -323,7 +341,7 @@ class Player:
         if self.index + 1 < anim.frames:
             self.index += 1
             return False
-        if self.group in EVENT_GROUPS:
+        if self.group in ONESHOT_GROUPS:
             return True
         if self.group == 'idle':
             self.loops_left -= 1
@@ -769,6 +787,59 @@ def kontrol():
         check('olay karesi yoksa idle ve harcanir', (none.state, none.mem['seen']), ('idle', {'a': 1}))
         check('sleep karesi yoksa idle', decide([], NOW, new_memory(NOW - 300_000), old_groups).state, 'idle')
 
+        print('--- tehlike (danger -> alarm) ---')
+        check('danger olayi okunur', normalize_status('a', NOW, event('danger', 1))['event'], 'danger')
+        check('danger alarm oynatir', state_of([('a', event('danger', 1), 0)]).state, 'alarm')
+        check('waiting danger dan once',
+              state_of([('a', {**event('danger', 1), 'waiting': True}, 0)]).state, 'waiting')
+        check('danger working den once',
+              state_of([('a', event('danger', 1, working=True), 0)]).state, 'alarm')
+        both = state_of([('a', event('danger', 1, age_ms=3000), 0), ('b', event('done', 2), 0)])
+        check('danger daha yeni done dan once', (both.state, both.mem['seen']), ('alarm', {'a': 1}))
+        after_alarm = decide(StatusScanner(folder).scan(), NOW + 1_600, finish_event(both.mem))
+        check('bekleyen done alarm bitince oynar', (after_alarm.state, after_alarm.new_event), ('done', True))
+        check('alarm tek seferlik', decide(StatusScanner(folder).scan(), NOW + 3_000,
+                                           finish_event(after_alarm.mem)).state, 'idle')
+        alarm = state_of([('a', event('danger', 1), 0)])
+        write('b', event('done', 5, age_ms=-500))
+        kept = decide(StatusScanner(folder).scan(), NOW + 500, alarm.mem)
+        check('done oynayan alarmi kesmez', (kept.state, kept.new_event, kept.mem['seen']),
+              ('alarm', False, {'a': 1}))
+        late_done = decide(StatusScanner(folder).scan(), NOW + 10_501, finish_event(kept.mem))
+        check('alarm sonrasi 10 sn asan done kaybolur', (late_done.state, late_done.mem['seen']),
+              ('idle', {'a': 1, 'b': 5}))
+        done_now = state_of([('a', event('done', 1), 0)])
+        write('b', event('danger', 2, age_ms=-200))
+        cut_in = decide(StatusScanner(folder).scan(), NOW + 200, done_now.mem)
+        check('danger oynayan done u keser', (cut_in.state, cut_in.new_event), ('alarm', True))
+
+        print('--- danger tek oynatma ve yas ---')
+        first = state_of([('a', event('danger', 3), 0)])
+        same = decide(StatusScanner(folder).scan(), NOW + 2_000, finish_event(first.mem))
+        check('ayni danger eventId tekrar oynamaz', (same.state, same.new_event), ('idle', False))
+        write('a', event('danger', 4, age_ms=-2_500))
+        next_one = decide(StatusScanner(folder).scan(), NOW + 2_500, same.mem)
+        check('yeni danger eventId yine oynar', (next_one.state, next_one.new_event), ('alarm', True))
+        check('danger 10.000 sn sinirinda oynar',
+              state_of([('a', event('danger', 1, age_ms=10_000), 0)]).state, 'alarm')
+        stale = state_of([('a', event('danger', 1, age_ms=10_001), 0)])
+        check('danger 10.001 sn eski oynamaz', (stale.state, stale.mem['seen']), ('idle', {'a': 1}))
+        held_danger = state_of([('a', {**event('danger', 1), 'waiting': True}, 0)])
+        check('waiting altinda danger harcanmaz', held_danger.mem['seen'], {})
+        freed = decide([normalize_status('a', NOW, event('danger', 1))], NOW + 4_000, held_danger.mem)
+        check('waiting biterse alarm oynar', (freed.state, freed.new_event), ('alarm', True))
+        check('alarm uykudan uyandirir',
+              state_of([('a', event('danger', 1), 0)], mem=new_memory(NOW - 300_000)).mem['last_active'], NOW)
+
+        print('--- alarm karesi yoksa ---')
+        no_alarm = GROUPS - {'alarm'}
+        check('alarm yoksa error oynar', state_of([('a', event('danger', 1), 0)], groups=no_alarm).state, 'error')
+        fb = state_of([('a', event('danger', 1, age_ms=1000), 0), ('b', event('error', 2), 0)], groups=no_alarm)
+        check('yedek error de danger onceligini korur', (fb.state, fb.mem['rank'], fb.mem['seen']),
+              ('error', 2, {'a': 1}))
+        bare = state_of([('a', event('danger', 1), 0)], groups=old_groups)
+        check('alarm ve error yoksa idle ve harcanir', (bare.state, bare.mem['seen']), ('idle', {'a': 1}))
+
         print('--- tarayici ---')
         clean()
         write('a', {'working': True}, 0)
@@ -840,18 +911,21 @@ def kontrol():
               {'idle': Anim(3, 50, 'idle', True), 'work': Anim(2, 83, 'work', True)})
         touch('selam', 2)
         touch('eksik', 1)
+        touch('alarm', 2)
         (art / 'animasyonlar.json').write_text(json.dumps({'animations': {
             'idle': {'frames': 3, 'ms': 50, 'group': 'idle', 'loop': True},
             'work': {'frames': 2, 'ms': 83, 'group': 'work', 'loop': True},
             'selam': {'frames': 2, 'ms': 100, 'group': 'done', 'loop': False},
             'eksik': {'frames': 5, 'ms': 100, 'group': 'error', 'loop': False},
+            'alarm': {'frames': 2, 'ms': 100, 'group': 'alarm', 'loop': False},
             'grupsuz': {'frames': 1, 'ms': 100, 'group': 'yok', 'loop': False},
             '../kacak': {'frames': 1, 'ms': 100, 'group': 'idle', 'loop': False},
             'bicimsiz': 12,
         }}), encoding='utf-8')
         skipped = []
         parsed = load_catalog(art, skipped.append)
-        check('gecerli animasyonlar', sorted(parsed), ['idle', 'selam', 'work'])
+        check('gecerli animasyonlar', sorted(parsed), ['alarm', 'idle', 'selam', 'work'])
+        check('alarm grubu taninir', parsed.get('alarm'), Anim(2, 100, 'alarm', False))
         check('atlananlar raporlanir', len(skipped), 4)
         (art / 'animasyonlar.json').write_text('{bozuk', encoding='utf-8')
         check('bozuk json da eski bos/calisma', sorted(load_catalog(art)), ['idle', 'work'])
@@ -878,6 +952,9 @@ def kontrol():
     shot.enter('done')
     check('olay bir kez ve sonuna kadar', [shot.step() for _ in range(4)], [False, False, False, True])
     check('olay ayni grupta yeniden baslar', (shot.enter('done', restart=True), shot.index), (True, -1))
+    siren = Player({**catalog, 'al': Anim(2, 100, 'alarm', True)}, random.Random(1))
+    siren.enter('alarm')
+    check('alarm bir kez ve sonuna kadar', [siren.step() for _ in range(3)], [False, False, True])
     held_player = Player(catalog, random.Random(1))
     held_player.enter('sleep')
     for _ in range(9):

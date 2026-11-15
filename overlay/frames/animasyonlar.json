@@ -53,6 +53,12 @@
       "ms": 50,
       "group": "error",
       "loop": false
+    },
+    "alarm": {
+      "frames": 32,
+      "ms": 50,
+      "group": "alarm",
+      "loop": false
     }
   }
 }
