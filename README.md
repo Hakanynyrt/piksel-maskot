@@ -1,5 +1,7 @@
 # piksel-maskot
 
+![The robot on top of the message box: idle, working, waiting for approval and celebrating](docs/demo.gif)
+
 A small 3D robot for the Claude desktop app on Windows. It stands on top of the message box in its own transparent window.
 
 - Idle: bounces a tennis ball, reads a book, does jumping jacks, waves, or cracks a whip, in random order. It never sleeps.
