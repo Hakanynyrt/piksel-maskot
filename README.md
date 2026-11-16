@@ -51,6 +51,10 @@ Restart the app after installing. When a Claude Code session starts, the mod lau
 
 This is an independent community project and is not affiliated with or endorsed by Anthropic.
 
+## Using it? Say hi
+
+If you use the robot, please star the repository so I know it is useful. If something does not work or you have an idea, [open an issue](https://github.com/Hakanynyrt/piksel-maskot/issues/new). The robot sends no usage data, so stars and issues are the only way to know who uses it.
+
 ## License
 
 MIT
